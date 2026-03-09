@@ -1,0 +1,104 @@
+import java.lang.annotation.*;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+
+
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface EmailValidator {
+    String message() default "Invalid email format";
+}
+
+
+class User {
+    private String name;
+
+    @EmailValidator
+    private String email;
+
+    public User() {}
+
+    public User(String name, String email) {
+        this.name = name;
+        this.email = email;
+    }
+
+   
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+
+    
+    public void setName(String name) { this.name = name; }
+    public void setEmail(String email) { this.email = email; }
+}
+
+
+class Validator {
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    );
+
+    public static List<String> validate(Object obj) {
+        List<String> errors = new ArrayList<>();
+        Class<?> clazz = obj.getClass();
+        Field[] fields = clazz.getDeclaredFields();
+
+        for (Field field : fields) {
+            
+            if (field.isAnnotationPresent(EmailValidator.class)) {
+                field.setAccessible(true); 
+                try {
+                    Object value = field.get(obj);
+                    if (value == null || value.toString().trim().isEmpty()) {
+                        errors.add(field.getName() + ": Cannot be empty");
+                    } else if (!EMAIL_PATTERN.matcher(value.toString().trim()).matches()) {
+                        errors.add(field.getName() + ": Invalid email format");
+                    }
+                } catch (IllegalAccessException e) {
+                    errors.add("Error accessing field: " + field.getName());
+                }
+            }
+        }
+        return errors;
+    }
+}
+
+
+public class EmailValidationApp {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("=== Java Email Validation (No Maven) ===");
+        System.out.print("Enter Name: ");
+        String name = scanner.nextLine();
+
+        System.out.print("Enter Email: ");
+        String email = scanner.nextLine();
+
+        
+        User user = new User(name, email);
+
+        
+        List<String> errors = Validator.validate(user);
+
+        
+        System.out.println("\n---------------- Results ----------------");
+        if (errors.isEmpty()) {
+            System.out.println(" Validation Successful!");
+            System.out.println("Name: " + user.getName());
+            System.out.println("Email: " + user.getEmail());
+        } else {
+            System.out.println(" Validation Failed:");
+            for (String error : errors) {
+                System.out.println("  - " + error);
+            }
+        }
+        System.out.println("-----------------------------------------");
+
+        scanner.close();
+    }
+}
