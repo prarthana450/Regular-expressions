@@ -1,0 +1,242 @@
+import java.lang.annotation.*;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface EmailFormat {
+    String message() default "Invalid email format";
+}
+
+/**
+ * Validates phone number format (10 digits)
+ */
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface PhoneFormat {
+    String message() default "Invalid phone number format";
+}
+
+/**
+ * Validates age is within acceptable range
+ */
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface AgeRange {
+    int min() default 18;
+    int max() default 65;
+    String message() default "Age must be between {min} and {max}";
+}
+
+/**
+ * Validates that a field is not empty
+ */
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface NotEmpty {
+    String message() default "This field cannot be empty";
+}
+
+
+class Employee {
+    @NotEmpty(message = "Employee ID cannot be empty")
+    private String employeeId;
+
+    @NotEmpty(message = "Employee Name cannot be empty")
+    private String name;
+
+    @EmailFormat(message = "Invalid email format")
+    private String email;
+
+    @PhoneFormat(message = "Invalid phone number format")
+    private String phone;
+
+    @AgeRange(min = 18, max = 65, message = "Age must be between 18 and 65")
+    private int age;
+
+    @NotEmpty(message = "Department cannot be empty")
+    private String department;
+
+    // Default Constructor
+    public Employee() {}
+
+    // Parameterized Constructor
+    public Employee(String employeeId, String name, String email, String phone, int age, String department) {
+        this.employeeId = employeeId;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.age = age;
+        this.department = department;
+    }
+
+    // Getters
+    public String getEmployeeId() { return employeeId; }
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+    public String getPhone() { return phone; }
+    public int getAge() { return age; }
+    public String getDepartment() { return department; }
+
+    // Setters
+    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    public void setName(String name) { this.name = name; }
+    public void setEmail(String email) { this.email = email; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public void setAge(int age) { this.age = age; }
+    public void setDepartment(String department) { this.department = department; }
+
+    @Override
+    public String toString() {
+        return String.format(
+            "Employee{ID='%s', Name='%s', Email='%s', Phone='%s', Age=%d, Department='%s'}",
+            employeeId, name, email, phone, age, department
+        );
+    }
+}
+
+class EmployeeValidator {
+    // Email Pattern: name@domain.extension
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    );
+
+    // Phone Pattern: 10 digits
+    private static final Pattern PHONE_PATTERN = Pattern.compile(
+        "^\\d{10}$"
+    );
+
+    
+    public static List<String> validate(Object obj) {
+        List<String> errors = new ArrayList<>();
+        Class<?> clazz = obj.getClass();
+        Field[] fields = clazz.getDeclaredFields();
+
+        for (Field field : fields) {
+           
+            if (field.isAnnotationPresent(EmailFormat.class)) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    if (value == null || value.toString().trim().isEmpty()) {
+                        errors.add(field.getName() + ": " + field.getAnnotation(EmailFormat.class).message());
+                    } else if (!EMAIL_PATTERN.matcher(value.toString().trim()).matches()) {
+                        errors.add(field.getName() + ": " + field.getAnnotation(EmailFormat.class).message());
+                    }
+                } catch (IllegalAccessException e) {
+                    errors.add("Error accessing field: " + field.getName());
+                }
+            }
+
+            if (field.isAnnotationPresent(PhoneFormat.class)) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    if (value == null || value.toString().trim().isEmpty()) {
+                        errors.add(field.getName() + ": " + field.getAnnotation(PhoneFormat.class).message());
+                    } else if (!PHONE_PATTERN.matcher(value.toString().trim()).matches()) {
+                        errors.add(field.getName() + ": " + field.getAnnotation(PhoneFormat.class).message());
+                    }
+                } catch (IllegalAccessException e) {
+                    errors.add("Error accessing field: " + field.getName());
+                }
+            }
+
+            
+            if (field.isAnnotationPresent(AgeRange.class)) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    if (value instanceof Integer) {
+                        int age = (Integer) value;
+                        AgeRange annotation = field.getAnnotation(AgeRange.class);
+                        if (age < annotation.min() || age > annotation.max()) {
+                            errors.add(field.getName() + ": " + annotation.message()
+                                .replace("{min}", String.valueOf(annotation.min()))
+                                .replace("{max}", String.valueOf(annotation.max())));
+                        }
+                    }
+                } catch (IllegalAccessException e) {
+                    errors.add("Error accessing field: " + field.getName());
+                }
+            }
+
+            
+            if (field.isAnnotationPresent(NotEmpty.class)) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    if (value == null || value.toString().trim().isEmpty()) {
+                        errors.add(field.getName() + ": " + field.getAnnotation(NotEmpty.class).message());
+                    }
+                } catch (IllegalAccessException e) {
+                    errors.add("Error accessing field: " + field.getName());
+                }
+            }
+        }
+        return errors;
+    }
+}
+
+
+
+public class EmployeeValidationApp {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+      
+        System.out.print("Enter Employee ID: ");
+        String employeeId = scanner.nextLine();
+
+        System.out.print("Enter Full Name: ");
+        String name = scanner.nextLine();
+
+        System.out.print("Enter Email Address: ");
+        String email = scanner.nextLine();
+
+        System.out.print("Enter Phone Number (10 digits): ");
+        String phone = scanner.nextLine();
+
+        System.out.print("Enter Age: ");
+        int age = Integer.parseInt(scanner.nextLine());
+
+        System.out.print("Enter Department: ");
+        String department = scanner.nextLine();
+
+        // Create Employee Object
+        Employee employee = new Employee(employeeId, name, email, phone, age, department);
+
+        // Run Validation
+        List<String> errors = EmployeeValidator.validate(employee);
+
+        // Display Results
+        System.out.println("\n" + "═".repeat(60));
+        System.out.println("                    VALIDATION RESULTS");
+        System.out.println("═".repeat(60));
+
+        if (errors.isEmpty()) {
+            System.out.println(" VALIDATION SUCCESSFUL!");
+            System.out.println();
+            System.out.println(employee);
+            System.out.println();
+            System.out.println("All fields passed validation checks.");
+        } else {
+            System.out.println(" VALIDATION FAILED!");
+            System.out.println();
+            System.out.println("Errors Found:");
+            for (int i = 0; i < errors.size(); i++) {
+                System.out.println("  " + (i + 1) + ". " + errors.get(i));
+            }
+        }
+        System.out.println("═".repeat(60));
+
+        scanner.close();
+    }
+}
